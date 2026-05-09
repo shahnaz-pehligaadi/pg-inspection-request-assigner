@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: pg-assignment-optimizer
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: LOG_LEVEL
+        value: INFO
+      - key: INSPECTION_SERVICE_URL
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: DEFAULT_DRY_RUN
+        value: "true"
+      - key: INSPECTION_SERVICE_TIMEOUT_SEC
+        value: "30"
+      - key: INSPECTION_SERVICE_PAGE_SIZE
+        value: "200"
+      - key: SOLVER_TIME_SEC
+        value: "30"
+      - key: PENDING_STATUS_ID
+        value: insp-req-status01
