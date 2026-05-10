@@ -11,7 +11,7 @@ from app.core.models import (
     AutoAssignStats,
     SkippedRequest,
 )
-from app.core.picker import pick_assignments
+from app.core.solver import solve_bucket
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,17 @@ async def run_auto_assign(
     start = time.monotonic()
     dry_run = request.dry_run if request.dry_run is not None else default_dry_run
 
-    logger.info("auto-assign run %s started (dry_run=%s)", run_id, dry_run)
+    if dry_run:
+        logger.info(
+            "auto-assign run %s started in DRY-RUN mode — NO writes to inspection-service; "
+            "proposed plan will only be logged",
+            run_id,
+        )
+    else:
+        logger.warning(
+            "auto-assign run %s started in APPLY mode — assignments WILL be written to inspection-service",
+            run_id,
+        )
 
     try:
         pending = await client.list_pending_requests()
@@ -89,11 +99,38 @@ async def run_auto_assign(
                 )
             continue
 
-        assigned, skipped = pick_assignments(
+        assigned, skipped = solve_bucket(
             key.pincode, key.date, bucket_reqs, inspectors
         )
         all_assigned.extend(assigned)
         all_skipped.extend(skipped)
+
+        logger.info(
+            "bucket pincode=%s date=%s: %d planned, %d skipped (out of %d candidates)",
+            key.pincode,
+            key.date,
+            len(assigned),
+            len(skipped),
+            len(bucket_reqs),
+        )
+        for a in assigned:
+            logger.info(
+                "  PLAN%s  request=%s -> employee=%s slot=%s pincode=%s date=%s",
+                "" if dry_run else " (APPLYING)",
+                a.request_id,
+                a.employee_id,
+                a.slot_time,
+                a.pincode,
+                a.date,
+            )
+        for s in skipped:
+            logger.info(
+                "  SKIP  request=%s reason=%s pincode=%s date=%s",
+                s.request_id,
+                s.reason,
+                s.pincode,
+                s.date,
+            )
 
         if not dry_run:
             for a in assigned:

@@ -5,7 +5,7 @@ Stateless service that auto-assigns pending inspection requests from `pg-inspect
 - **No DB.** All reads/writes go through Inspection Service HTTP APIs.
 - **Strict `preferredTime`.** A request is only assigned if an inspector has an open slot at the exact preferred time. Otherwise it is reported as `skipped: NO_SLOT_AT_PREFERRED_TIME`.
 - **Per-pincode batching.** All pending requests worldwide → grouped by `(pincode, date)` → solved one bucket at a time, in order of earliest date and highest urgency-weighted demand.
-- **Phase 1 (current):** greedy first-fit picker. CP-SAT solver lands in Phase 2.
+- **OR-Tools CP-SAT** ([`app/core/solver.py`](app/core/solver.py)) — bipartite matching between requests and feasible `(inspector, slot)` pairs. Objective maximizes assignments, weighted by urgency. Slot conflicts and double-booking are hard constraints; the solver finds an optimal matching even under contention where a greedy picker would lose placements.
 
 ## Endpoints
 
