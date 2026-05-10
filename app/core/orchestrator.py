@@ -36,6 +36,17 @@ async def run_auto_assign(
         raise RuntimeError(
             f"list_pending_requests failed: {exc.__class__.__name__}: {exc}"
         ) from exc
+
+    with_preferred_time = sum(1 for r in pending if r.preferred_time)
+    logger.info(
+        "auto-assign run %s: fetched %d PENDING requests from inspection service "
+        "(%d with preferredTime, %d without)",
+        run_id,
+        len(pending),
+        with_preferred_time,
+        len(pending) - with_preferred_time,
+    )
+
     buckets = bucket_pending_requests(pending)
 
     if request.pincodes:
