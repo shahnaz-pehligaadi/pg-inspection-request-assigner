@@ -29,7 +29,13 @@ async def run_auto_assign(
 
     logger.info("auto-assign run %s started (dry_run=%s)", run_id, dry_run)
 
-    pending = await client.list_pending_requests()
+    try:
+        pending = await client.list_pending_requests()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("failed to list pending requests")
+        raise RuntimeError(
+            f"list_pending_requests failed: {exc.__class__.__name__}: {exc}"
+        ) from exc
     buckets = bucket_pending_requests(pending)
 
     if request.pincodes:

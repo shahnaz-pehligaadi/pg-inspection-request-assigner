@@ -66,3 +66,40 @@ def test_urgency_weight_unknown_levels_default_to_one():
     assert urgency_weight(None) == 1
     assert urgency_weight("MYSTERY") == 1
     assert urgency_weight("urgent") == 100
+
+
+def test_pending_request_lifts_pincode_from_car_address():
+    """Real Inspection Service payload puts pincode under carAddress.pincode."""
+    raw = {
+        "requestId": "ins_req_X",
+        "carAddress": {
+            "line1": "1 MG Road",
+            "pincode": "560001",
+            "city": "Bengaluru",
+            "state": "Karnataka",
+        },
+        "houseAddress": {
+            "line1": "1 MG Road",
+            "pincode": "999999",  # different — confirm we pick carAddress
+            "city": "Bengaluru",
+            "state": "Karnataka",
+        },
+        "preferredTime": "2026-05-10T04:30:00.000Z",
+        "urgencyLevel": "MEDIUM",
+        "status": "insp-req-status01",
+    }
+    req = PendingRequest.model_validate(raw)
+    assert req.pincode == "560001"
+    assert req.request_id == "ins_req_X"
+
+
+def test_pending_request_flat_pincode_still_works():
+    """Test fixtures pass pincode= directly — keep backwards compat."""
+    req = PendingRequest(
+        requestId="r1",
+        pincode="560001",
+        preferredTime=None,
+        urgencyLevel="LOW",
+        status="insp-req-status01",
+    )
+    assert req.pincode == "560001"

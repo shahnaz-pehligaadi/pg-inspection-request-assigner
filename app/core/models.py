@@ -1,22 +1,35 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PendingRequest(BaseModel):
     """A pending inspection request as returned by Inspection Service.
 
     Only the fields the optimizer cares about; extras are ignored.
+
+    Pincode lives at `carAddress.pincode` in the API payload — the validator
+    below lifts it to the top level. Tests can also pass `pincode=` directly.
     """
 
-    model_config = {"extra": "ignore"}
+    model_config = {"extra": "ignore", "populate_by_name": True}
 
     request_id: str = Field(alias="requestId")
     pincode: str
     preferred_time: Optional[datetime] = Field(default=None, alias="preferredTime")
     urgency_level: Optional[str] = Field(default=None, alias="urgencyLevel")
     status: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def _lift_pincode_from_car_address(cls, data: Any) -> Any:
+        if isinstance(data, dict) and not data.get("pincode"):
+            car_address = data.get("carAddress") or data.get("car_address") or {}
+            pincode = car_address.get("pincode") if isinstance(car_address, dict) else None
+            if pincode:
+                data = {**data, "pincode": pincode}
+        return data
 
 
 class Slot(BaseModel):

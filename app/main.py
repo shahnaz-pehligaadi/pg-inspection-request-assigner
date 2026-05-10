@@ -36,5 +36,10 @@ async def readyz() -> dict[str, str]:
 )
 async def auto_assign(payload: AutoAssignRequest | None = None) -> AutoAssignResponse:
     payload = payload or AutoAssignRequest()
-    async with InspectionServiceClient() as client:
-        return await run_auto_assign(client, payload, settings.default_dry_run)
+    try:
+        async with InspectionServiceClient() as client:
+            return await run_auto_assign(client, payload, settings.default_dry_run)
+    except RuntimeError as exc:
+        # Upstream Inspection Service issue (network, schema mismatch, 4xx/5xx).
+        # Surface a structured 502 so callers (cron logs, curl) see what failed.
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
