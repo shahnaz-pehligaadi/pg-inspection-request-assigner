@@ -17,6 +17,7 @@ from ortools.sat.python import cp_model
 
 from app.config import settings
 from app.core.bucketing import urgency_weight
+from app.core.distance import distance_km_or_none
 from app.core.models import (
     Assignment,
     InspectorAvailability,
@@ -34,6 +35,11 @@ class _Candidate:
     slot_idx: int
     slot_time: str
     employee_id: str
+    # Integer km from request location to inspector location, or None if
+    # either side has no GeoPoint. None means "no distance signal" — the
+    # solver applies zero penalty so unknown-location candidates aren't
+    # biased against known-location ones.
+    distance_km: int | None = None
 
 
 def _build_candidates(
@@ -60,6 +66,8 @@ def _build_candidates(
         for i_idx, ins in enumerate(inspectors):
             if ins.availability_status != "AVAILABLE":
                 continue
+            dist = distance_km_or_none(req.location, ins.location)
+            dist_int = int(round(dist)) if dist is not None else None
             for s_idx, slot in enumerate(ins.slots):
                 if slot.is_available and slot.slot_time == wanted:
                     cands.append(
@@ -68,6 +76,7 @@ def _build_candidates(
                             slot_idx=s_idx,
                             slot_time=slot.slot_time,
                             employee_id=ins.employee_id,
+                            distance_km=dist_int,
                         )
                     )
 
@@ -134,16 +143,27 @@ def solve_bucket(
         if len(vars_) > 1:
             model.Add(sum(vars_) <= 1)
 
-    # Objective: maximize Σ (W_assign + W_urgency · urgency(r)) · x.
-    # The W_assign baseline ensures we always prefer assigning over leaving idle,
-    # while W_urgency tilts contention toward higher-urgency requests.
+    # Objective: maximize Σ (W_assign + W_urgency · urgency(r) - penalty) · x.
+    # The W_assign baseline ensures we always prefer assigning over leaving idle.
+    # W_urgency tilts contention toward higher-urgency requests.
+    # W_distance penalizes far candidates so ties break toward the closer inspector;
+    # the per-candidate penalty is capped at (W_assign - 1) so any feasible
+    # assignment still yields a strictly positive coefficient — i.e. distance
+    # can break ties but can never cause us to drop an assignment.
+    max_penalty = max(settings.w_assign - 1, 0)
     objective_terms: list[cp_model.IntVar] = []
     for r_idx, cands in candidates.items():
-        weight = settings.w_assign + settings.w_urgency * urgency_weight(
+        base = settings.w_assign + settings.w_urgency * urgency_weight(
             requests[r_idx].urgency_level
         )
-        for c_idx in range(len(cands)):
-            objective_terms.append(weight * x[(r_idx, c_idx)])
+        for c_idx, cand in enumerate(cands):
+            raw_penalty = (
+                settings.w_distance * cand.distance_km
+                if cand.distance_km is not None
+                else 0
+            )
+            penalty = min(raw_penalty, max_penalty)
+            objective_terms.append((base - penalty) * x[(r_idx, c_idx)])
     model.Maximize(sum(objective_terms))
 
     solver = cp_model.CpSolver()

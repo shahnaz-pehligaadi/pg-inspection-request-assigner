@@ -4,6 +4,26 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, model_validator
 
 
+class GeoPoint(BaseModel):
+    """GeoJSON Point: { type: "Point", coordinates: [lng, lat] }.
+
+    Note the coordinate order — GeoJSON is (longitude, latitude), not (lat, lng).
+    """
+
+    model_config = {"extra": "ignore"}
+
+    type: str = "Point"
+    coordinates: list[float] = Field(default_factory=list)
+
+    @property
+    def lng(self) -> float | None:
+        return self.coordinates[0] if len(self.coordinates) >= 2 else None
+
+    @property
+    def lat(self) -> float | None:
+        return self.coordinates[1] if len(self.coordinates) >= 2 else None
+
+
 class PendingRequest(BaseModel):
     """A pending inspection request as returned by Inspection Service.
 
@@ -20,6 +40,7 @@ class PendingRequest(BaseModel):
     preferred_time: Optional[datetime] = Field(default=None, alias="preferredTime")
     urgency_level: Optional[str] = Field(default=None, alias="urgencyLevel")
     status: str
+    location: Optional[GeoPoint] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -51,6 +72,7 @@ class InspectorAvailability(BaseModel):
     availability_status: str = Field(alias="availabilityStatus")
     slots: list[Slot] = Field(default_factory=list)
     has_empty_slots: bool = Field(default=False, alias="hasEmptySlots")
+    location: Optional[GeoPoint] = None
 
 
 class BucketKey(BaseModel):

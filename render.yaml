@@ -22,5 +22,11 @@ services:
         value: "200"
       - key: SOLVER_TIME_SEC
         value: "30"
+      - key: W_ASSIGN
+        value: "1000"
+      - key: W_URGENCY
+        value: "10"
+      - key: W_DISTANCE
+        value: "5"
       - key: PENDING_STATUS_ID
         value: insp-req-status01

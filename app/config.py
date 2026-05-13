@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     solver_time_sec: int = 30
     w_assign: int = 1000
     w_urgency: int = 10
+    # Penalty per kilometer of distance between request and inspector.
+    # Worst-case city span is ~50 km → penalty up to 250. Stays well below
+    # w_assign (1000) so distance can never cause us to drop an assignment.
+    w_distance: int = 5
 
     pending_status_id: str = "insp-req-status01"
 
